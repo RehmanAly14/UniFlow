@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuthStore } from '../../../store/authStore';
 import { supabase } from '../../../utils/supabase';
@@ -17,8 +19,10 @@ import { BACKEND_URL } from '../../../utils/config';
 import { useFocusEffect } from "@react-navigation/native";
 import { Linking } from "react-native";
 
+const { width } = Dimensions.get('window');
+
 export default function StudentDashboard() {
-  const { user, signOut } = useAuthStore();
+  const { user, signOut,session } = useAuthStore();
   const router = useRouter();
 
   const [todayClasses, setTodayClasses] = useState<any[]>([]);
@@ -33,6 +37,7 @@ export default function StudentDashboard() {
   const fetchTodaySchedule = useCallback(async () => {
     try {
       setLoading(true);
+      const token = session?.access_token;
 
       let degree = user?.degree;
       let semester = user?.semester;
@@ -58,7 +63,11 @@ export default function StudentDashboard() {
           degree
         )}&semester=${encodeURIComponent(
           semester
-        )}&section=${encodeURIComponent(section)}`
+        )}&section=${encodeURIComponent(section)}`,{
+          headers:{
+            Authorization: `Bearer ${token}`,
+          }
+        }
       );
 
       const data = await response.json();
@@ -132,124 +141,155 @@ export default function StudentDashboard() {
     router.replace('/(auth)');
   };
 
+  const getInitials = (name: string) => {
+    return name
+      ?.split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'S';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.name}>
-              {user?.fullName || 'Student'}
-            </Text>
-          </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header with Gradient */}
+        <LinearGradient
+          colors={['#4F46E5', '#7C3AED']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradientHeader}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.userInfo}>
+              <View style={styles.avatarContainer}>
+                <Text style={styles.avatarText}>
+                  {getInitials(user?.fullName || 'Student')}
+                </Text>
+              </View>
+              <View>
+                <Text style={styles.greeting}>Welcome back,</Text>
+                <Text style={styles.name}>
+                  {user?.fullName || 'Student'}
+                </Text>
+              </View>
+            </View>
 
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={24}
-              color="#EF4444"
-            />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Ionicons
+                name="log-out-outline"
+                size={22}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>
-            Today's Schedule
-          </Text>
+          {/* Quick Stats */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Ionicons name="book-outline" size={24} color="#4F46E5" />
+              <Text style={styles.statNumber}>{todayClasses.length}</Text>
+              <Text style={styles.statLabel}>Today's Classes</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="document-text-outline" size={24} color="#7C3AED" />
+              <Text style={styles.statNumber}>{recentResources.length}</Text>
+              <Text style={styles.statLabel}>Resources</Text>
+            </View>
+          </View>
+
+          {/* Schedule Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Today's Schedule</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
 
           {loading ? (
-            <View style={styles.card}>
-              <ActivityIndicator
-                size="large"
-                color="#4F46E5"
-              />
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color="#4F46E5" />
             </View>
           ) : todayClasses.length === 0 ? (
-            <View style={styles.card}>
-              <Text style={styles.cardText}>
-                No classes scheduled for today 🎉
-              </Text>
+            <View style={styles.emptyCard}>
+              <Ionicons name="calendar-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyText}>No classes scheduled for today 🎉</Text>
             </View>
           ) : (
             todayClasses.map((cls, index) => (
               <View key={index} style={styles.classCard}>
-                <View style={styles.timeRow}>
-                  <Ionicons
-                    name="time-outline"
-                    size={16}
-                    color="#6B7280"
-                  />
-                  <Text style={styles.timeText}>
-                    {cls.startTime} - {cls.endTime}
-                  </Text>
+                <View style={styles.classHeader}>
+                  <View style={styles.timeBadge}>
+                    <Ionicons name="time-outline" size={14} color="#4F46E5" />
+                    <Text style={styles.timeText}>
+                      {cls.startTime} - {cls.endTime}
+                    </Text>
+                  </View>
+                  <View style={styles.roomBadge}>
+                    <Ionicons name="location-outline" size={14} color="#6B7280" />
+                    <Text style={styles.roomText}>{cls.room}</Text>
+                  </View>
                 </View>
 
-                <Text style={styles.subject}>
-                  {cls.subjectCode}
-                </Text>
-
-                <Text style={styles.meta}>
-                  📍 {cls.room}
-                </Text>
-
-                <Text style={styles.meta}>
-                  👨‍🏫 {cls.teacherName}
-                </Text>
+                <Text style={styles.subject}>{cls.subjectCode}</Text>
+                
+                <View style={styles.teacherContainer}>
+                  <View style={styles.teacherAvatar}>
+                    <Text style={styles.teacherInitial}>
+                      {cls.teacherName?.charAt(0) || 'T'}
+                    </Text>
+                  </View>
+                  <Text style={styles.teacherName}>{cls.teacherName}</Text>
+                </View>
               </View>
             ))
           )}
 
-         <Text style={styles.sectionTitle}>
-  Recent Resources
-</Text>
+          {/* Resources Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Resources</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
 
-{recentResources.length === 0 ? (
-  <View style={styles.card}>
-    <Text style={styles.cardText}>
-      No recent resources available.
-    </Text>
-  </View>
-) : (
-  recentResources.map((resource) => (
-    <TouchableOpacity
-      key={resource.id}
-      style={styles.resourceCard}
-      onPress={() =>
-        Linking.openURL(resource.fileUrl)
-      }
-    >
-      <View style={styles.resourceIcon}>
-        <Ionicons
-          name="document-text"
-          size={22}
-          color="#4F46E5"
-        />
-      </View>
+          {recentResources.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="folder-open-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyText}>No resources available</Text>
+            </View>
+          ) : (
+            recentResources.map((resource) => (
+              <TouchableOpacity
+                key={resource.id}
+                style={styles.resourceCard}
+                onPress={() => Linking.openURL(resource.fileUrl)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.resourceIcon}>
+                  <Ionicons name="document-text" size={22} color="#4F46E5" />
+                </View>
 
-      <View style={{ flex: 1 }}>
-        <Text
-          style={styles.resourceTitle}
-          numberOfLines={1}
-        >
-          {resource.title}
-        </Text>
+                <View style={styles.resourceInfo}>
+                  <Text style={styles.resourceTitle} numberOfLines={1}>
+                    {resource.title}
+                  </Text>
+                  <Text style={styles.resourceMeta}>
+                    {resource.subjectCode}
+                  </Text>
+                </View>
 
-        <Text style={styles.resourceMeta}>
-          {resource.subjectCode}
-        </Text>
-      </View>
-
-      <Ionicons
-        name="chevron-forward"
-        size={18}
-        color="#9CA3AF"
-      />
-    </TouchableOpacity>
-  ))
-)}
+                <View style={styles.resourceArrow}>
+                  <Ionicons name="arrow-forward" size={18} color="#9CA3AF" />
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -259,145 +299,252 @@ export default function StudentDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F3F4F6',
   },
-
-  header: {
+  gradientHeader: {
+    paddingTop: 20,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 24,
   },
-
-  greeting: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-
-  logoutButton: {
-    padding: 8,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 8,
-  },
-
-  content: {
-    padding: 24,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-    marginTop: 8,
-  },
-
-  card: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-
-  classCard: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4F46E5',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-
-  timeRow: {
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
-
-  timeText: {
-    marginLeft: 6,
-    color: '#6B7280',
-    fontSize: 13,
+  avatarContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-
-  subject: {
+  avatarText: {
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
   },
-
-  meta: {
+  greeting: {
     fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '400',
+  },
+  name: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  logoutButton: {
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    marginTop: -10,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginHorizontal: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 6,
+  },
+  statLabel: {
+    fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
   },
-
-  cardText: {
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  seeAllText: {
+    fontSize: 14,
+    color: '#4F46E5',
+    fontWeight: '600',
+  },
+  loadingCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 40,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 40,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyText: {
+    color: '#9CA3AF',
+    marginTop: 12,
+    fontSize: 16,
+  },
+  classCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  classHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  timeText: {
+    marginLeft: 4,
+    color: '#4F46E5',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  roomBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  roomText: {
+    marginLeft: 4,
     color: '#6B7280',
-    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  subject: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 10,
+  },
+  teacherContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  teacherAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  teacherInitial: {
+    color: '#4F46E5',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  teacherName: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '500',
   },
   resourceCard: {
-  flexDirection: "row",
-  alignItems: "center",
-  backgroundColor: "#fff",
-  padding: 14,
-  borderRadius: 12,
-  marginBottom: 10,
-  shadowColor: "#000",
-  shadowOffset: {
-    width: 0,
-    height: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  shadowOpacity: 0.05,
-  shadowRadius: 2,
-  elevation: 2,
-},
-
-resourceIcon: {
-  width: 42,
-  height: 42,
-  borderRadius: 10,
-  backgroundColor: "#EEF2FF",
-  justifyContent: "center",
-  alignItems: "center",
-  marginRight: 12,
-},
-
-resourceTitle: {
-  fontSize: 14,
-  fontWeight: "600",
-  color: "#111827",
-},
-
-resourceMeta: {
-  fontSize: 12,
-  color: "#6B7280",
-  marginTop: 2,
-},
+  resourceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  resourceInfo: {
+    flex: 1,
+  },
+  resourceTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  resourceMeta: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  resourceArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

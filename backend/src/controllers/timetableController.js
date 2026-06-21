@@ -216,9 +216,6 @@ exports.getTeacherTimetable = async (req, res) => {
       },
     });
 
-    console.log("Teacher:", teacherName);
-    console.log("Found:", timetable.length);
-
     res.status(200).json(timetable);
 
   } catch (error) {

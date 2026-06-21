@@ -4,13 +4,22 @@ import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../../store/authStore';
 import { BACKEND_URL } from '../../../utils/config';
+import { useRouter } from 'expo-router';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const SUBJECT_COLORS = ['#4F46E5', '#0891B2', '#16A34A', '#D97706', '#DC2626', '#7C3AED'];
+const SUBJECT_COLORS = ['#6366F1', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function TeacherSchedule() {
-  const { user } = useAuthStore();
-  const [activeDay, setActiveDay] = useState('Mon');
+  const { user, session } = useAuthStore();
+  const router = useRouter();
+  
+  // Dynamic initialization to current weekday
+  const [activeDay, setActiveDay] = useState(() => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const currentName = dayNames[new Date().getDay()];
+    return DAYS.includes(currentName) ? currentName : 'Mon';
+  });
+  
   const [timetableData, setTimetableData] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
@@ -20,8 +29,15 @@ export default function TeacherSchedule() {
 
   const fetchTimetable = async () => {
     try {
+      const token = session?.access_token;
       setLoading(true);
-      const res = await fetch(`${BACKEND_URL}/api/timetable/teacher?teacherName=${user?.fullName || ''}`);
+      const res = await fetch(`${BACKEND_URL}/api/timetable/teacher?teacherName=${encodeURIComponent(user?.fullName || '')}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       const data = await res.json();
       
       const grouped: Record<string, any[]> = { Mon: [], Tue: [], Wed: [], Thu: [], Fri: [] };
@@ -30,10 +46,10 @@ export default function TeacherSchedule() {
           const dayPrefix = item.day.substring(0, 3);
           if (grouped[dayPrefix]) {
             grouped[dayPrefix].push({
-              time: `${item.startTime}-${item.endTime}`,
+              time: `${item.startTime} - ${item.endTime}`,
               subject: item.subjectCode,
               room: item.room,
-              classInfo: `${item.degree} - Sem ${item.semester} - Sec ${item.section}`
+              classInfo: `${item.degree} • Sem ${item.semester} • Sec ${item.section}`
             });
           }
         });
@@ -50,58 +66,94 @@ export default function TeacherSchedule() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header Profile Layout */}
       <View style={styles.header}>
-        <Text style={styles.title}>My Schedule</Text>
-        <Text style={styles.subtitle}>{user?.fullName || 'Teacher'}</Text>
+        <TouchableOpacity 
+          style={styles.backBtn} 
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={20} color="#334155" />
+        </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.title}>My Schedule</Text>
+          <Text style={styles.subtitle}>{user?.fullName || 'Faculty Instructor'}</Text>
+        </View>
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* Day Tabs */}
-      <View style={styles.dayTabs}>
-        {DAYS.map((day) => (
-          <TouchableOpacity
-            key={day}
-            style={[styles.dayTab, activeDay === day && styles.dayTabActive]}
-            onPress={() => setActiveDay(day)}
-          >
-            <Text style={[styles.dayText, activeDay === day && styles.dayTextActive]}>{day}</Text>
-            {timetableData[day]?.length > 0 && (
-              <View style={[styles.dot, activeDay === day && styles.dotActive]} />
-            )}
-          </TouchableOpacity>
-        ))}
+      {/* Day Navigation Tabs */}
+      <View style={styles.tabsContainer}>
+        <View style={styles.dayTabs}>
+          {DAYS.map((day) => {
+            const isActive = activeDay === day;
+            const hasClasses = timetableData[day]?.length > 0;
+            return (
+              <TouchableOpacity
+                key={day}
+                style={[styles.dayTab, isActive && styles.dayTabActive]}
+                onPress={() => setActiveDay(day)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dayText, isActive && styles.dayTextActive]}>{day}</Text>
+                {hasClasses && (
+                  <View style={[styles.dot, isActive && styles.dotActive]} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      {/* Main Content Area */}
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {loading ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color="#4F46E5" />
-            <Text style={styles.emptyText}>Loading schedule...</Text>
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color="#6366F1" />
+            <Text style={styles.stateText}>Assembling your schedule...</Text>
           </View>
         ) : classes.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="sunny-outline" size={40} color="#9CA3AF" />
-            <Text style={styles.emptyText}>No classes today! 🎉</Text>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="sparkles" size={32} color="#6366F1" />
+            </View>
+            <Text style={styles.emptyTitle}>No Classes Scheduled</Text>
+            <Text style={styles.stateText}>Enjoy your free day or catch up on resource uploads!</Text>
           </View>
         ) : (
-          classes.map((cls, idx) => (
-            <View key={idx} style={[styles.classCard, { borderLeftColor: SUBJECT_COLORS[idx % SUBJECT_COLORS.length] }]}>
-              <View style={styles.classTime}>
-                <Ionicons name="time-outline" size={14} color="#6B7280" />
-                <Text style={styles.timeText}>{cls.time}</Text>
-              </View>
-              <Text style={styles.subjectName}>{cls.subject}</Text>
-              <View style={styles.classMeta}>
-                <View style={styles.metaItem}>
-                  <Ionicons name="location-outline" size={13} color="#9CA3AF" />
-                  <Text style={styles.metaText}>{cls.room}</Text>
+          classes.map((cls, idx) => {
+            const accentColor = SUBJECT_COLORS[idx % SUBJECT_COLORS.length];
+            return (
+              <View key={idx} style={styles.classCard}>
+                {/* Visual Identity Strip */}
+                <View style={[styles.cardAccentStrip, { backgroundColor: accentColor }]} />
+                
+                <View style={styles.cardMain}>
+                  <View style={styles.cardTopRow}>
+                    <View style={styles.classTime}>
+                      <Ionicons name="time" size={15} color="#64748B" />
+                      <Text style={styles.timeText}>{cls.time}</Text>
+                    </View>
+                    <View style={[styles.subjectBadge, { backgroundColor: `${accentColor}12` }]}>
+                      <Text style={[styles.subjectBadgeText, { color: accentColor }]}>{cls.subject}</Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.classMetaInfo}>{cls.classInfo}</Text>
+                  
+                  <View style={styles.classDivider} />
+                  
+                  <View style={styles.metaItem}>
+                    <Ionicons name="location" size={15} color="#94A3B8" />
+                    <Text style={styles.metaText}>Room {cls.room}</Text>
+                  </View>
                 </View>
-                <View style={styles.metaItem}>
-                  <Ionicons name="people-outline" size={13} color="#9CA3AF" />
-                  <Text style={styles.metaText}>{cls.classInfo}</Text>
-                </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -109,25 +161,192 @@ export default function TeacherSchedule() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { padding: 24, paddingBottom: 16, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#111827' },
-  subtitle: { fontSize: 13, color: '#6B7280', marginTop: 4 },
-  dayTabs: { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 16, paddingBottom: 16, gap: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  dayTab: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: '#F3F4F6', gap: 4 },
-  dayTabActive: { backgroundColor: '#4F46E5' },
-  dayText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-  dayTextActive: { color: '#fff' },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#9CA3AF' },
-  dotActive: { backgroundColor: '#A5B4FC' },
-  content: { padding: 16, gap: 12 },
-  classCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderLeftWidth: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  classTime: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  timeText: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
-  subjectName: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 10 },
-  classMeta: { flexDirection: 'row', gap: 16 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: 13, color: '#6B7280' },
-  emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyText: { fontSize: 16, color: '#6B7280' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F8FAFC' 
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitleContainer: {
+    alignItems: 'center',
+  },
+  title: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#0F172A' 
+  },
+  subtitle: { 
+    fontSize: 13, 
+    color: '#64748B', 
+    marginTop: 2 
+  },
+  tabsContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dayTabs: { 
+    flexDirection: 'row', 
+    backgroundColor: '#F1F5F9', 
+    padding: 4, 
+    borderRadius: 14,
+    gap: 4
+  },
+  dayTab: { 
+    flex: 1, 
+    alignItems: 'center', 
+    paddingVertical: 10, 
+    borderRadius: 10, 
+    backgroundColor: 'transparent',
+    position: 'relative',
+    justifyContent: 'center'
+  },
+  dayTabActive: { 
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  dayText: { 
+    fontSize: 13, 
+    fontWeight: '600', 
+    color: '#64748B' 
+  },
+  dayTextActive: { 
+    color: '#0F172A',
+    fontWeight: '700'
+  },
+  dot: { 
+    width: 4, 
+    height: 4, 
+    borderRadius: 2, 
+    backgroundColor: '#94A3B8',
+    position: 'absolute',
+    bottom: 4
+  },
+  dotActive: { 
+    backgroundColor: '#6366F1' 
+  },
+  content: { 
+    padding: 20, 
+    gap: 16 
+  },
+  classCard: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 20, 
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2 
+  },
+  cardAccentStrip: {
+    width: 6,
+    height: '100%',
+  },
+  cardMain: {
+    flex: 1,
+    padding: 18,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  classTime: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6 
+  },
+  timeText: { 
+    fontSize: 14, 
+    color: '#475569', 
+    fontWeight: '600',
+    letterSpacing: -0.2
+  },
+  subjectBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  subjectBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  classMetaInfo: { 
+    fontSize: 15, 
+    fontWeight: '600', 
+    color: '#0F172A', 
+    marginBottom: 12 
+  },
+  classDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginBottom: 12,
+  },
+  metaItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6 
+  },
+  metaText: { 
+    fontSize: 13, 
+    color: '#64748B',
+    fontWeight: '500'
+  },
+  loadingState: { 
+    alignItems: 'center', 
+    paddingTop: 100, 
+    gap: 14 
+  },
+  emptyState: { 
+    alignItems: 'center', 
+    paddingTop: 60, 
+    paddingHorizontal: 40,
+    gap: 12 
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  stateText: { 
+    fontSize: 14, 
+    color: '#64748B', 
+    textAlign: 'center',
+    lineHeight: 20
+  },
 });

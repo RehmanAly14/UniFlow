@@ -14,11 +14,11 @@ const { authMiddleware } = require("../middleware/authMiddleware");
 
 router.post("/upload", upload.single("file"), uploadTimetable);
 
-router.get("/student", getStudentTimetable);
+router.get("/student", authMiddleware, getStudentTimetable);
 
-router.get("/teacher", getTeacherTimetable);
+router.get("/teacher", authMiddleware, getTeacherTimetable);
 
-router.get("/all", getAllTimetables);
+router.get("/all", authMiddleware, getAllTimetables);
 router.get(
   "/teacher/today",
   authMiddleware,

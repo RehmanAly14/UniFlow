@@ -10,12 +10,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { BACKEND_URL } from "../../../utils/config";
 import { useAuthStore } from "../../../store/authStore";
 
 export default function TeacherFiles() {
   const { session } = useAuthStore();
+  const router = useRouter();
 
   const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,95 +50,99 @@ export default function TeacherFiles() {
   }, []);
 
   const openFile = async (url: string) => {
-    await Linking.openURL(url);
+    try {
+      if (!url) return;
+      await Linking.openURL(url);
+    } catch (err) {
+      console.error("Couldn't open URL", err);
+    }
   };
 
   const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Ionicons
-          name="document-text-outline"
-          size={24}
-          color="#4F46E5"
-        />
+    <TouchableOpacity 
+      style={styles.card}
+      activeOpacity={0.7}
+      onPress={() => openFile(item.fileUrl)}
+    >
+      <View style={styles.cardBody}>
+        {/* Document Vector Identity */}
+        <View style={styles.iconContainer}>
+          <Ionicons
+            name="document-text-outline"
+            size={22}
+            color="#4F46E5"
+          />
+        </View>
 
-        <View style={{ flex: 1 }}>
-          <Text style={styles.titleText}>
+        {/* Informational Context */}
+        <View style={styles.textDetails}>
+          <Text style={styles.titleText} numberOfLines={1}>
             {item.title}
           </Text>
+          {item.description ? (
+            <Text style={styles.descText} numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
 
-          <Text style={styles.desc}>
-            {item.description}
-          </Text>
+          {/* Metadata Parameters Pills */}
+          <View style={styles.metaRow}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{item.degree}</Text>
+            </View>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Sem {item.semester}</Text>
+            </View>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Sec {item.section}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Trailing Interactive Accent */}
+        <View style={styles.actionArrowWrapper}>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
         </View>
       </View>
-
-      <View style={styles.metaRow}>
-        <Text style={styles.meta}>
-          {item.degree}
-        </Text>
-
-        <Text style={styles.meta}>
-          Sem {item.semester}
-        </Text>
-
-        <Text style={styles.meta}>
-          {item.section}
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        style={styles.openButton}
-        onPress={() => openFile(item.fileUrl)}
-      >
-        <Ionicons
-          name="cloud-download-outline"
-          size={18}
-          color="#fff"
-        />
-
-        <Text style={styles.buttonText}>
-          Open Resource
-        </Text>
-      </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Structural Header Module */}
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>
-          My Resources
-        </Text>
+        <TouchableOpacity 
+          style={styles.backBtn} 
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={20} color="#334155" />
+        </TouchableOpacity>
+        <Text style={styles.screenTitle}>My Resources</Text>
+        <View style={{ width: 40 }} />
       </View>
 
+      {/* Conditional Interface State Controller */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator
-            size="large"
-            color="#4F46E5"
-          />
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={styles.stateMessage}>Retrieving catalog items...</Text>
         </View>
       ) : resources.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons
-            name="folder-open-outline"
-            size={50}
-            color="#9CA3AF"
-          />
-
-          <Text style={styles.emptyText}>
-            No resources uploaded yet
-          </Text>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="folder-open-outline" size={32} color="#4F46E5" />
+          </View>
+          <Text style={styles.emptyHeading}>No Shared Material</Text>
+          <Text style={styles.stateMessage}>Resources published via the dashboard will populate here.</Text>
         </View>
       ) : (
         <FlatList
           data={resources}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id || item._id}
           renderItem={renderItem}
-          contentContainerStyle={{
-            padding: 16,
-          }}
+          contentContainerStyle={styles.listPadding}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </SafeAreaView>
@@ -146,84 +152,126 @@ export default function TeacherFiles() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F8FAFC",
   },
-
   header: {
-    padding: 24,
-    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
   },
-
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   screenTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#111827",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0F172A",
   },
-
+  listPadding: {
+    padding: 20,
+    gap: 12,
+  },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 12,
+    paddingHorizontal: 40,
   },
-
-  emptyText: {
-    color: "#6B7280",
-    fontSize: 16,
-  },
-
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 12,
-    elevation: 2,
   },
-
-  cardHeader: {
-    flexDirection: "row",
-    gap: 12,
-  },
-
-  titleText: {
-    fontSize: 16,
+  emptyHeading: {
+    fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
+    color: "#1E293B",
+    marginBottom: 4,
   },
-
-  desc: {
+  stateMessage: {
+    color: "#64748B",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
     marginTop: 4,
-    color: "#6B7280",
   },
-
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: "hidden",
+  },
+  cardBody: {
+    flexDirection: "row",
+    padding: 16,
+    alignItems: "center",
+  },
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  textDetails: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  titleText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  descText: {
+    marginTop: 3,
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 18,
+  },
   metaRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 12,
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
   },
-
-  meta: {
-    backgroundColor: "#EEF2FF",
-    color: "#4F46E5",
+  badge: {
+    backgroundColor: "#F1F5F9",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    fontSize: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
-
-  openButton: {
-    marginTop: 14,
-    backgroundColor: "#4F46E5",
-    padding: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-  },
-
-  buttonText: {
-    color: "#fff",
+  badgeText: {
+    color: "#475569",
+    fontSize: 11,
     fontWeight: "600",
+  },
+  actionArrowWrapper: {
+    marginLeft: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
