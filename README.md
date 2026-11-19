@@ -128,8 +128,6 @@ UniFlow is a university academic management platform with a React Native Expo fr
 - AI chat requires `GROQ_API_KEY` for the Groq OpenAI-compatible endpoint.
 - Results lookup uses `UAF_API_KEY` for the external LMS API.
 
-## Development Tips
-
 
 ## Contact
 
