@@ -130,9 +130,6 @@ UniFlow is a university academic management platform with a React Native Expo fr
 
 ## Development Tips
 
-- Use the backend `nodemon` dev script for live reloading.
-- Update `frontend/utils/config.ts` if the backend address changes.
-- Review Prisma schema before running migrations.
 
 ## Contact
 
